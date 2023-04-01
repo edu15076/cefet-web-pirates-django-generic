@@ -1,52 +1,64 @@
-from django.shortcuts import render
-from django.db.models import F,ExpressionWrapper,DecimalField
+from django.views.generic.edit import CreateView, DeleteView, UpdateView
+from django.views.generic.list import ListView
+from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth import login
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.mixins import LoginRequiredMixin
+from .models import Tesouro, User
+from django.db.models import F, ExpressionWrapper, DecimalField, Sum
+from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect
-from django.views import View
-from django.forms import ModelForm
-from django.urls import reverse
 
-from .models import Tesouro
-# Create your views here.
-class ListarTesouros(View):
-    def get(self,request):
-        lst_tesouros = Tesouro.objects.annotate(valor_total=ExpressionWrapper(F('quantidade')*F('preco'),\
-                            output_field=DecimalField(max_digits=10,\
-                                                    decimal_places=2,\
-                                                     blank=True)\
-                                                    )\
-                            )
-        valor_total = 0
-        for tesouro in lst_tesouros:
-            valor_total += tesouro.valor_total
-        return render(request,"lista_tesouros.html",{"lista_tesouros":lst_tesouros,
-                                                     "total_geral":valor_total})
-class TesouroForm(ModelForm):
-    class Meta:
-        model = Tesouro
-        fields = ['nome', 'quantidade', 'preco', 'img_tesouro']
-        labels = {
-            "img_tesouro": "Imagem"
-        }
 
-class SalvarTesouro(View):
-    def get_tesouro(self,id):
-        if id:
-            return Tesouro.objects.get(id=id)
-        return None
+class CreateUser(CreateView):
+    model = User
+    form_class = UserCreationForm
+    template_name = 'create_user.html'
+    success_url = reverse_lazy('lista_tesouros')
 
-    def get(self,request,id=None):
-        return render(request,"salvar_tesouro.html",{"tesouroForm":TesouroForm(instance=self.get_tesouro(id))})
+    def form_valid(self, form):
+        user = form.save()
+        login(self.request, user)
+        return HttpResponseRedirect(self.success_url)
 
-    def post(self,request,id=None):
-        form = TesouroForm(request.POST,request.FILES, instance=self.get_tesouro(id))
 
-        if form.is_valid():
-            form.save()
-            return HttpResponseRedirect(reverse('lista_tesouros') )
-        else:
-            return render(request,"salvar_tesouro.html",{"tesouroForm":form})
+class SalvarTesouro(LoginRequiredMixin):
+    model = Tesouro
+    fields = ['nome', 'quantidade', 'preco', 'img_tesouro']
+    template_name = 'salvar_tesouro.html'
+    success_url = reverse_lazy('lista_tesouros')
 
-class RemoverTesouro(View):
-    def get(self,request,id):
-        Tesouro.objects.get(id=id).delete()
-        return HttpResponseRedirect(reverse('lista_tesouros') )
+
+class InserirTesouro(SalvarTesouro, CreateView):
+    def form_valid(self, form):
+        form.instance.pirata = self.request.user
+        return super().form_valid(form)
+
+
+class AtualizarTesouro(SalvarTesouro, UpdateView):
+    def form_valid(self, form):
+        form.instance.pirata = self.request.user
+        return super().form_valid(form)
+
+
+class RemoverTesouro(LoginRequiredMixin, DeleteView):
+    model = Tesouro
+    success_url = reverse_lazy('lista_tesouros')
+
+
+class ListarTesouros(LoginRequiredMixin, ListView):
+    model = Tesouro
+    template_name = 'lista_tesouros.html'
+
+    def get_queryset(self):
+        user = self.request.user
+        valor_total = ExpressionWrapper(F('preco') * F('quantidade'),
+                                        output_field=DecimalField(max_digits=10, decimal_places=2))
+        return user.tesouros.annotate(valor_total=valor_total)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(context['object_list'].aggregate(total_geral=Sum('valor_total',
+                                                                        output_field=DecimalField(max_digits=10,
+                                                                                                  decimal_places=2))))
+        return context
