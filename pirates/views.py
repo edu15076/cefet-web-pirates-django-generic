@@ -3,11 +3,11 @@ from django.views.generic.list import ListView
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from .models import Tesouro, User
 from django.db.models import F, ExpressionWrapper, DecimalField, Sum
 from django.urls import reverse_lazy
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, Http404
 
 
 class CreateUser(CreateView):
@@ -35,15 +35,23 @@ class InserirTesouro(SalvarTesouro, CreateView):
         return super().form_valid(form)
 
 
-class AtualizarTesouro(SalvarTesouro, UpdateView):
-    def form_valid(self, form):
-        form.instance.pirata = self.request.user
-        return super().form_valid(form)
+class AtualizarTesouro(SalvarTesouro, UserPassesTestMixin, UpdateView):
+    def test_func(self):
+        return self.get_object().pirata == self.request.user
+
+    def handle_no_permission(self):
+        return HttpResponseRedirect(reverse_lazy('lista_tesouros'))
 
 
-class RemoverTesouro(LoginRequiredMixin, DeleteView):
+class RemoverTesouro(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Tesouro
     success_url = reverse_lazy('lista_tesouros')
+
+    def test_func(self):
+        return self.get_object().pirata == self.request.user
+
+    def handle_no_permission(self):
+        return HttpResponseRedirect(reverse_lazy('lista_tesouros'))
 
 
 class ListarTesouros(LoginRequiredMixin, ListView):
