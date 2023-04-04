@@ -53,6 +53,23 @@
     </table>
     <a id="inserir" href="{% url "inserir" %}" class="add">+</a>
   </section>
-  <p>Yarr Harr, marujo! Aqui é o temido Barba-Ruiva e você deve me ajudar
-      a contabilizar os espólios das minhas aventuras!</p>
+  <p>
+      Yarr Harr, marujo! Aqui é o temido Barba-Ruiva e você deve me ajudar
+      a contabilizar os espólios das minhas aventuras!
+  </p>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+    <script>
+        $(document).ready(() => {
+            $.ajax({
+                type: 'GET',
+                url: '{% url "listar" %}',
+
+                success: request => {
+                    {#request = JSON.parse(request)#}
+                    console.log(request[0])
+                }
+            });
+        });
+    </script>
+
 {% endblock %}

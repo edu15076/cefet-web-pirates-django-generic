@@ -1,3 +1,4 @@
+from django.shortcuts import render
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 from django.views.generic.list import ListView
 from django.contrib.auth.views import LoginView, LogoutView
@@ -7,7 +8,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from .models import Tesouro, User
 from django.db.models import F, ExpressionWrapper, DecimalField, Sum
 from django.urls import reverse_lazy
-from django.http import HttpResponseRedirect, Http404
+from django.http import HttpResponseRedirect, JsonResponse
+from django.core import serializers
+import json
 
 
 class CreateUser(CreateView):
@@ -56,7 +59,7 @@ class RemoverTesouro(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
 class ListarTesouros(LoginRequiredMixin, ListView):
     model = Tesouro
-    template_name = 'lista_tesouros.html'
+    http_method_names = ['get']
 
     def get_queryset(self):
         user = self.request.user
@@ -64,9 +67,14 @@ class ListarTesouros(LoginRequiredMixin, ListView):
                                         output_field=DecimalField(max_digits=10, decimal_places=2))
         return user.tesouros.annotate(valor_total=valor_total)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update(context['object_list'].aggregate(total_geral=Sum('valor_total',
-                                                                        output_field=DecimalField(max_digits=10,
-                                                                                                  decimal_places=2))))
-        return context
+    def get(self, request, *args, **kwargs):
+        object_list = self.get_queryset()
+        total_geral = object_list.aggregate(total_geral=Sum('valor_total'))
+        total_geral['total_geral'] = int(total_geral['total_geral'])
+
+        json_tesouros = serializers.serialize('json', object_list)
+        tesouros = json.loads(json_tesouros)
+        tesouros.append(total_geral)
+        json_tesouros = json.dumps(tesouros)
+
+        return JsonResponse(json_tesouros, status=200, safe=False)

@@ -15,13 +15,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.views.generic import TemplateView
 from pirates import views
 from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', views.ListarTesouros.as_view(), name="lista_tesouros"),
+    path('', TemplateView.as_view(template_name='lista_tesouros.html'), name="lista_tesouros"),
+    path('listar/', views.ListarTesouros.as_view(), name='listar'),
     path('inserir/', views.InserirTesouro.as_view(), name="inserir"),
     path('editar/<int:pk>/', views.AtualizarTesouro.as_view(), name="editar"),
     path('remover/<int:pk>/', views.RemoverTesouro.as_view(), name="excluir"),
