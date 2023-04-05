@@ -48,13 +48,20 @@ class AtualizarTesouro(SalvarTesouro, UserPassesTestMixin, UpdateView):
 
 class RemoverTesouro(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Tesouro
-    success_url = reverse_lazy('lista_tesouros')
+    http_method_names = ['post']
 
     def test_func(self):
         return self.get_object().pirata == self.request.user
 
     def handle_no_permission(self):
-        return HttpResponseRedirect(reverse_lazy('lista_tesouros'))
+        return HttpResponseRedirect(reverse('lista_tesouros'))
+
+    def post(self, request, *args, **kwargs):
+        if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return HttpResponseRedirect(reverse('lista_tesouros'))
+
+        self.get_object().delete()
+        return JsonResponse('', status=200, safe=False)
 
 
 class ListarTesouros(LoginRequiredMixin, ListView):
@@ -72,10 +79,11 @@ class ListarTesouros(LoginRequiredMixin, ListView):
             return HttpResponseRedirect(reverse('lista_tesouros'))
 
         object_qs = self.get_queryset()
-        total_geral = object_qs.aggregate(total_geral=Sum('valor_total'))
-        total_geral['total_geral'] = float(total_geral['total_geral'])
-
         object_list = list(object_qs.values('nome', 'quantidade', 'preco', 'img_tesouro', 'valor_total', 'id'))
-        object_list.append(total_geral)
+
+        if object_list:
+            total_geral = object_qs.aggregate(total_geral=Sum('valor_total'))
+            total_geral['total_geral'] = float(total_geral['total_geral'])
+            object_list.append(total_geral)
 
         return JsonResponse(object_list, status=200, safe=False)
