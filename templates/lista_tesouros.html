@@ -24,29 +24,11 @@
         </tr>
       </thead>
       <tbody>
-        {% for tesouro in object_list %}
-        <tr>
-          <td><img src="{{ tesouro.img_tesouro.url }}"></td>
-          <td>{{ tesouro.nome }}</td>
-          <td>{{ tesouro.preco }}</td>
-          <td>{{ tesouro.quantidade }}</td>
-          <td>{{ tesouro.valor_total|floatformat:-2 }}</td>
-          <td><a href="{% url "editar" tesouro.id %}"><img src="{% static 'imgs/edit.png' %}" alt="Editar"></a></td>
-          <td>
-              <form method="POST" action="{% url "excluir" tesouro.id %}">
-                  {% csrf_token %}
-                  <button>
-                      <img src="{% static "imgs/delete.svg" %}" alt="Deletar">
-                  </button>
-              </form>
-          </td>
-        </tr>
-        {% endfor %}
       </tbody>
       <tfoot>
         <tr>
           <td colspan="4">Total geral</td>
-          <td> {{ total_geral|floatformat:-2 }}</td>
+          <td id="total-geral"></td>
           <td colspan="2"></td>
         </tr>
       </tfoot>
@@ -60,15 +42,43 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
     <script>
         $(document).ready(() => {
+            // Lista tesouros
             $.ajax({
                 type: 'GET',
                 url: '{% url "listar" %}',
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
 
                 success: request => {
-                    {#request = JSON.parse(request)#}
-                    console.log(request[0])
+                    $('#total-geral').html(request.pop().total_geral);
+                    let treasureTableEl = document.getElementsByTagName('tbody')[0];
+                    for (let tesouro of request) console.log(tesouro)
+                    for (let tesouro of request)
+                        treasureTableEl.innerHTML += `<tr>
+                                                <td><img src="media/${tesouro.img_tesouro}"></td>
+                                                <td>${tesouro.nome}</td>
+                                                <td>${tesouro.preco}</td>
+                                                <td>${tesouro.quantidade}</td>
+                                                <td>${tesouro.valor_total}</td>
+                                                <td>
+                                                    <a href="/editar/${tesouro.id}/">
+                                                        <img src="{% static 'imgs/edit.png' %}" alt="Editar">
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    <form method="POST" action="/remover/${tesouro.id}/">
+                                                        {% csrf_token %}
+                                                        <button>
+                                                            <img src="{% static "imgs/delete.svg" %}" alt="Deletar">
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>`;
                 }
             });
+
+            //
         });
     </script>
 

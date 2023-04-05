@@ -7,7 +7,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from .models import Tesouro, User
 from django.db.models import F, ExpressionWrapper, DecimalField, Sum
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.http import HttpResponseRedirect, JsonResponse
 from django.core import serializers
 import json
@@ -68,13 +68,14 @@ class ListarTesouros(LoginRequiredMixin, ListView):
         return user.tesouros.annotate(valor_total=valor_total)
 
     def get(self, request, *args, **kwargs):
-        object_list = self.get_queryset()
-        total_geral = object_list.aggregate(total_geral=Sum('valor_total'))
-        total_geral['total_geral'] = int(total_geral['total_geral'])
+        if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return HttpResponseRedirect(reverse('lista_tesouros'))
 
-        json_tesouros = serializers.serialize('json', object_list)
-        tesouros = json.loads(json_tesouros)
-        tesouros.append(total_geral)
-        json_tesouros = json.dumps(tesouros)
+        object_qs = self.get_queryset()
+        total_geral = object_qs.aggregate(total_geral=Sum('valor_total'))
+        total_geral['total_geral'] = float(total_geral['total_geral'])
 
-        return JsonResponse(json_tesouros, status=200, safe=False)
+        object_list = list(object_qs.values('nome', 'quantidade', 'preco', 'img_tesouro', 'valor_total', 'id'))
+        object_list.append(total_geral)
+
+        return JsonResponse(object_list, status=200, safe=False)
